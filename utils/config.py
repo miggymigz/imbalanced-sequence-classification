@@ -1,4 +1,4 @@
-## Configuration file for Power dataset
+# Configuration file for Power dataset
 class PowerConfig:
 
     # parameters for preprocessing data
@@ -22,8 +22,8 @@ class PowerConfig:
     NUM_ENSEMBLES = 10
 
     # smote model parameters
-    N = 1 # number of times to resample each point
-    K = 5 #
+    N = 1  # number of times to resample each point
+    K = 5
     BETA = 0.001
 
     # autoencoder parameters
@@ -35,7 +35,7 @@ class PowerConfig:
     D_HIDDEN_NEURONS = 64
     D_NUM_LAYERS = 2
     A_HIDDEN_NEURONS = 64
-    A_NUM_LAYERS=2
+    A_NUM_LAYERS = 2
     AE_DENSE_NEURONS = 32
     DROPOUT_IN = 0.8
     DROPOUT_OUT = 0.8
@@ -82,8 +82,8 @@ class SentimentConfig:
     NUM_ENSEMBLES = 10
 
     # smote model parameters
-    N = 1 # number of times to resample each point
-    K = 5 #
+    N = 1  # number of times to resample each point
+    K = 5
     BETA = 0.001
 
     # autoencoder parameters
@@ -95,7 +95,7 @@ class SentimentConfig:
     D_HIDDEN_NEURONS = 64
     D_NUM_LAYERS = 2
     A_HIDDEN_NEURONS = 64
-    A_NUM_LAYERS=2
+    A_NUM_LAYERS = 2
     AE_DENSE_NEURONS = 32
     DROPOUT_IN = 0.8
     DROPOUT_OUT = 0.8

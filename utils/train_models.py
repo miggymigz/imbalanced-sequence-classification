@@ -8,6 +8,8 @@ from utils.config import *
 from sklearn.model_selection import train_test_split
 
 # train seq2seq model
+
+
 class Seq2seqTraining:
 
     def __init__(self, data):
@@ -43,7 +45,8 @@ class Seq2seqTraining:
             train_dat = np.load(train_folder + 'dat' + str(j) + '.npy')
             train_lab = np.load(train_folder + 'lab' + str(j) + '.npy')
 
-            decoder_train = np.zeros((len(train_lab), 1, self.Config.NUM_CLASSES))
+            decoder_train = np.zeros(
+                (len(train_lab), 1, self.Config.NUM_CLASSES))
 
             # store accuracy and loss
             accuracy = -1
@@ -58,23 +61,28 @@ class Seq2seqTraining:
                               epochs=1, verbose=1, class_weight=weights)
 
                 # predict on model to get val and train f1
-                pred = models[j].predict([train_dat, decoder_train], batch_size=self.Config.BATCH_SIZE)
+                pred = models[j].predict(
+                    [train_dat, decoder_train], batch_size=self.Config.BATCH_SIZE)
                 train_pred = pred.argmax(axis=2)
                 np.save(save_folder + 'train_pred.npy', pred)
                 np.save(save_folder + 'train_lab.npy', train_lab)
 
-                pred = models[j].predict([x_val, decoder_val], batch_size=self.Config.BATCH_SIZE)
+                pred = models[j].predict(
+                    [x_val, decoder_val], batch_size=self.Config.BATCH_SIZE)
                 np.save('val_pred.npy', pred)
                 val_pred = pred.argmax(axis=2)
 
                 # get f1-scores and loss
                 if self.Config.NUM_CLASSES == 2:
-                    train_f1 += [np.mean(f1_score(train_lab.argmax(axis=2), train_pred, average=None)[1:])]
-                    val_f1 += [np.mean(f1_score(y_val, val_pred, average=None)[1:])]
+                    train_f1 += [np.mean(f1_score(train_lab.argmax(axis=2),
+                                                  train_pred, average=None)[1:])]
+                    val_f1 += [np.mean(f1_score(y_val,
+                                                val_pred, average=None)[1:])]
                 else:
                     train_f1 += [np.mean(f1_score(train_lab.argmax(axis=2), train_pred,
                                                   labels=[0, 1, 2], average=None)[1:])]
-                    val_f1 += [np.mean(f1_score(y_val, val_pred, labels=[0, 1, 2], average=None)[1:])]
+                    val_f1 += [np.mean(f1_score(y_val, val_pred,
+                                                labels=[0, 1, 2], average=None)[1:])]
                 val_loss += [log_loss(y_val, val_pred)]
                 # np.save(save_folder + 'val_pred.npy', val_pred)
                 np.save(save_folder + 'val_lab.npy', y_val)
@@ -88,22 +96,28 @@ class Seq2seqTraining:
                     with open(save_folder + "seq_ensem" + str(j) + ".json", "w") as json_file:
                         json_file.write(model_json)
                     # serialize weights to HDF5
-                    models[j].save_weights(save_folder + "seq_ensem" + str(j) + ".h5")
+                    models[j].save_weights(
+                        save_folder + "seq_ensem" + str(j) + ".h5")
 
                     # save weights, gives us a sense of where the model left off
-                    np.save(save_folder + 'ensem_' + str(j) + '_val_loss.npy', val_loss)
-                    np.save(save_folder + 'ensem_' + str(j) + '_val_fscore.npy', val_f1)
+                    np.save(save_folder + 'ensem_' +
+                            str(j) + '_val_loss.npy', val_loss)
+                    np.save(save_folder + 'ensem_' +
+                            str(j) + '_val_fscore.npy', val_f1)
 
-                np.save(save_folder + 'ensem_' + str(j) + '_val_loss.npy', val_loss)
-                np.save(save_folder + 'ensem_' + str(j) + '_val_fscore.npy', val_f1)
-                np.save(save_folder + 'ensem_' + str(j) + '_train_fscore.npy', train_f1)
+                np.save(save_folder + 'ensem_' +
+                        str(j) + '_val_loss.npy', val_loss)
+                np.save(save_folder + 'ensem_' +
+                        str(j) + '_val_fscore.npy', val_f1)
+                np.save(save_folder + 'ensem_' + str(j) +
+                        '_train_fscore.npy', train_f1)
 
         return
 
 
 # train sequence to one models
 class Seq2oneTraining:
-    
+
     def __init__(self, data):
 
         if data == 'Sentiment':
@@ -128,7 +142,8 @@ class Seq2oneTraining:
         decoder_val = np.zeros((len(y_val), 1, self.Config.NUM_CLASSES))
 
         # get weight labels for data
-        weights = class_weight.compute_class_weight('balanced', np.unique(y_val), y_val)
+        weights = class_weight.compute_class_weight(
+            'balanced', np.unique(y_val), y_val)
 
         models = []
         model = model_func()
@@ -144,7 +159,8 @@ class Seq2oneTraining:
                 train_lab = train_lab[:, -1, :]
             train_lab = np.expand_dims(train_lab, axis=1)
 
-            decoder_train = np.zeros((len(train_lab), 1, self.Config.NUM_CLASSES))
+            decoder_train = np.zeros(
+                (len(train_lab), 1, self.Config.NUM_CLASSES))
 
             # store accuracy and loss
             accuracy = -1
@@ -159,12 +175,14 @@ class Seq2oneTraining:
                               epochs=1, verbose=1, class_weight=weights)
 
                 # predict on model to get val and train f1
-                pred = models[j].predict([train_dat, decoder_train], batch_size=self.Config.BATCH_SIZE)
+                pred = models[j].predict(
+                    [train_dat, decoder_train], batch_size=self.Config.BATCH_SIZE)
                 train_pred = pred.argmax(axis=2)
                 np.save(save_folder + 'train_pred.npy', pred)
                 np.save(save_folder + 'train_lab.npy', train_lab)
 
-                pred = models[j].predict([x_val, decoder_val], batch_size=self.Config.BATCH_SIZE)
+                pred = models[j].predict(
+                    [x_val, decoder_val], batch_size=self.Config.BATCH_SIZE)
                 np.save('val_pred.npy', pred)
                 val_pred = pred.argmax(axis=2)
 
@@ -175,7 +193,8 @@ class Seq2oneTraining:
                 else:
                     train_f1 += [np.mean(f1_score(train_lab.argmax(axis=2), train_pred,
                                                   labels=[0, 1, 2], average=None)[1:])]
-                    val_f1 += [np.mean(f1_score(y_val, val_pred, labels=[0, 1, 2], average=None)[1:])]
+                    val_f1 += [np.mean(f1_score(y_val, val_pred,
+                                                labels=[0, 1, 2], average=None)[1:])]
                 val_loss += [log_loss(y_val, np.squeeze(pred, 1))]
 
                 # save model weights, loss and f1-score if validation accuracy improves
@@ -187,15 +206,21 @@ class Seq2oneTraining:
                     with open(save_folder+"seq_ensem" + str(j) + ".json", "w") as json_file:
                         json_file.write(model_json)
                     # serialize weights to HDF5
-                    models[j].save_weights(save_folder+"seq_ensem" + str(j) + ".h5")
+                    models[j].save_weights(
+                        save_folder+"seq_ensem" + str(j) + ".h5")
 
                     # save weights, gives us a sense of where the model left off
-                    np.save(save_folder +'ensem_' + str(j) + '_val_loss.npy', val_loss)
-                    np.save(save_folder +'ensem_' + str(j) + '_val_fscore.npy', val_f1)
+                    np.save(save_folder + 'ensem_' +
+                            str(j) + '_val_loss.npy', val_loss)
+                    np.save(save_folder + 'ensem_' +
+                            str(j) + '_val_fscore.npy', val_f1)
 
-                np.save(save_folder + 'ensem_' + str(j) + '_val_loss.npy', val_loss)
-                np.save(save_folder + 'ensem_' + str(j) + '_val_fscore.npy', val_f1)
-                np.save(save_folder + 'ensem_' + str(j) + '_train_fscore.npy', train_f1)
+                np.save(save_folder + 'ensem_' +
+                        str(j) + '_val_loss.npy', val_loss)
+                np.save(save_folder + 'ensem_' +
+                        str(j) + '_val_fscore.npy', val_f1)
+                np.save(save_folder + 'ensem_' + str(j) +
+                        '_train_fscore.npy', train_f1)
 
         return
 
@@ -224,12 +249,14 @@ class AutoencoderTraining:
 
         # transform data
         min_max_scaler = MinMaxScaler()
-        train_scale = np.reshape(x_train, (x_train.shape[0], x_train.shape[1] * x_train.shape[2]))
+        train_scale = np.reshape(
+            x_train, (x_train.shape[0], x_train.shape[1] * x_train.shape[2]))
         y_train = min_max_scaler.fit_transform(train_scale)
         y_train.resize(x_train.shape)
 
         # get validation set
-        x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.1, random_state=42)
+        x_train, x_val, y_train, y_val = train_test_split(
+            x_train, y_train, test_size=0.1, random_state=42)
         print(x_train.shape)
         print(x_val.shape)
 

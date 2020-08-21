@@ -7,6 +7,8 @@ from utils.AttentionWithContext import AttentionWithContext
 from imblearn.over_sampling import SMOTE, ADASYN
 from utils.AttentionLSTM import AttentionDecoder
 
+import keras.optimizers as optimizers
+
 
 class Seq2seqModel:
 
@@ -28,7 +30,6 @@ class Seq2seqModel:
                                      recurrent_dropout=0.2, activation='relu', return_state=True,
                                      kernel_initializer='orthogonal')(inputs)
 
-
         # iteratively add total number of layers to encoder
         for i in range(self.Config.NUM_LAYERS - 1):
             enc, state_h, state_c = LSTM(self.Config.HIDDEN_NEURONS, return_sequences=True, stateful=False,
@@ -49,7 +50,8 @@ class Seq2seqModel:
         inputs_ = decoder_input
 
         for _ in range(self.Config.DECODESTEPS):
-            atten, state_h, state_c = decoder_lstm(inputs_, initial_state=states, constants=enc)
+            atten, state_h, state_c = decoder_lstm(
+                inputs_, initial_state=states, constants=enc)
             outputs = Lambda(lambda x: K.expand_dims(x, axis=1))(state_h)
             outputs = decoder_dropout(outputs)
             outputs = decoder_dense(outputs)
@@ -61,16 +63,20 @@ class Seq2seqModel:
             states = [state_h, state_c]
             inputs_ = outputs
 
-        decoder_outputs = Lambda(lambda x: K.concatenate(x, axis=1))(all_outputs)
+        decoder_outputs = Lambda(
+            lambda x: K.concatenate(x, axis=1))(all_outputs)
 
         # build model
-        model = Model(inputs=[inputs, decoder_input], outputs=[decoder_outputs])
+        model = Model(inputs=[inputs, decoder_input],
+                      outputs=[decoder_outputs])
 
         # define optimizer
-        adadelta = optimizers.Adadelta(lr=1.0, rho=0.95, epsilon=1e-08, decay=0.0, clipvalue=100)
+        adadelta = optimizers.Adadelta(
+            lr=1.0, rho=0.95, epsilon=1e-08, decay=0.0, clipvalue=100)
 
         # compile model
-        model.compile(loss='categorical_crossentropy', optimizer=adadelta, metrics=['accuracy'])
+        model.compile(loss='categorical_crossentropy',
+                      optimizer=adadelta, metrics=['accuracy'])
 
         return model
 
@@ -123,10 +129,12 @@ class Seq2oneModel:
         model = Model(inputs=[inputs, decoder_input], outputs=[outputs])
 
         # define optimizer
-        adadelta = optimizers.Adadelta(lr=1.0, rho=0.95, epsilon=1e-08, decay=0.0, clipvalue=100)
+        adadelta = optimizers.Adadelta(
+            lr=1.0, rho=0.95, epsilon=1e-08, decay=0.0, clipvalue=100)
 
         # compile model
-        model.compile(loss='categorical_crossentropy', optimizer=adadelta, metrics=['accuracy'])
+        model.compile(loss='categorical_crossentropy',
+                      optimizer=adadelta, metrics=['accuracy'])
 
         return model
 
@@ -155,8 +163,8 @@ class Autoencoder:
         # iteratively add total number of layers to encoder
         for i in range(self.Config.NUM_LAYERS - 1):
             enc, state_h, state_c = LSTM(self.Config.HIDDEN_NEURONS, return_sequences=True, stateful=False,
-                                activation='relu', dropout=0.2, recurrent_dropout=0.2,
-                                return_state=True, kernel_initializer='orthogonal')(enc)
+                                         activation='relu', dropout=0.2, recurrent_dropout=0.2,
+                                         return_state=True, kernel_initializer='orthogonal')(enc)
 
         # deal with attention now
         atten = AttentionWithContext()(enc)
@@ -174,7 +182,8 @@ class Autoencoder:
         model = Model(inputs=[inputs], outputs=outputs)
         hidden_states = Model(inputs=model.inputs, outputs=atten)
 
-        adadelta = optimizers.Adadelta(lr=1.0, rho=0.95, epsilon=1e-08, decay=0.0, clipvalue=100)
+        adadelta = optimizers.Adadelta(
+            lr=1.0, rho=0.95, epsilon=1e-08, decay=0.0, clipvalue=100)
 
         model.compile(loss='mse',
                       optimizer=adadelta,
@@ -182,8 +191,8 @@ class Autoencoder:
 
         return model, hidden_states
 
-
     # load models and build encoder, decoder and autoencoder
+
     def loadAutoencoder(self, model_h5):
 
         # need to define the inputs
@@ -215,7 +224,8 @@ class Autoencoder:
         # build autoencoder
         model = Model(inputs=[inputs], outputs=outputs)
 
-        adadelta = optimizers.Adadelta(lr=1.0, rho=0.95, epsilon=1e-08, decay=0.0)
+        adadelta = optimizers.Adadelta(
+            lr=1.0, rho=0.95, epsilon=1e-08, decay=0.0)
 
         model.compile(loss='mse',
                       optimizer=adadelta,
@@ -307,7 +317,3 @@ class Autoencoder:
             print('save ensem ' + str(ensem))
             np.save(save_dir + 'ensem_dat' + str(ensem) + '.npy', x_syn)
             np.save(save_dir + 'ensem_lab' + str(ensem) + '.npy', y_res_)
-
-
-        return
-

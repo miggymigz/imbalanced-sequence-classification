@@ -1,0 +1,5 @@
+fire==0.3.1
+Keras==2.3.1
+scikit-learn==0.23.2
+tensorflow==1.15.3
+imbalanced-learn==0.7.0
