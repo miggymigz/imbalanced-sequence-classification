@@ -12,16 +12,10 @@ from utils.AttentionLSTM import AttentionDecoder
 
 # implementation of improved wassertein gan in tensorflow
 
+
 class seq2seqIWGAN:
-    def __init__(self, data):
-
-        if data == 'Sentiment':
-            self.Config = SentimentConfig()
-        elif data == 'Power':
-            self.Config = PowerConfig()
-        else:
-            raise ValueError('Invalid value for data option')
-
+    def __init__(self, data, config):
+        self.Config = config
         self.batchsize = self.Config.GAN_BATCH_SIZE
         self.timesteps = self.Config.TIMESTEPS
         self.decodesteps = self.Config.DECODESTEPS
@@ -45,11 +39,11 @@ class seq2seqIWGAN:
                                           output_keep_prob=self.Config.DROPOUT_OUT)
 
             # define noisy hidden state for fake data
-            h_state = tf.random_normal([self.batchsize, self.Config.G_HIDDEN_NEURONS])
+            h_state = tf.random_normal(
+                [self.batchsize, self.Config.G_HIDDEN_NEURONS])
             c_state = tf.zeros([self.batchsize, self.Config.G_HIDDEN_NEURONS])
 
             lstm_state = rnn.LSTMStateTuple(c_state, h_state)
-
 
             # define encoder
             # stack layers of LSTM
@@ -58,17 +52,18 @@ class seq2seqIWGAN:
 
             # set initial state based on if it's real data or not
             if noisy == True:
-                enc_init_state = [lstm_state for _ in range(self.Config.G_NUM_LAYERS)]
+                enc_init_state = [lstm_state for _ in range(
+                    self.Config.G_NUM_LAYERS)]
                 enc_init_state = tuple(enc_init_state)
 
             else:
-                enc_init_state = enc_stacked_lstm.zero_state(self.batchsize, tf.float32)
+                enc_init_state = enc_stacked_lstm.zero_state(
+                    self.batchsize, tf.float32)
 
             enc_outputs, enc_states = tf.nn.dynamic_rnn(enc_stacked_lstm, real_data, initial_state=enc_init_state, time_major=False,
-                                                scope='generator/encoder')
+                                                        scope='generator/encoder')
 
             enc_outputs = self.leakyrelu(enc_outputs)
-
 
             # define decoder
             dec_stacked_lstm = rnn.MultiRNNCell(
@@ -82,10 +77,9 @@ class seq2seqIWGAN:
                                                         time_major=False,
                                                         scope='generator/decoder')
 
-
             if self.Config.INSTANCE_NOISE:
                 enc_output_noise = tf.random_normal([self.batchsize, self.timesteps, self.Config.G_HIDDEN_NEURONS],
-                                                stddev=noise_level)
+                                                    stddev=noise_level)
                 dec_output_noise = tf.random_normal([self.batchsize, self.decodesteps, self.Config.G_HIDDEN_NEURONS],
                                                     stddev=noise_level)
                 enc_outputs += enc_output_noise
@@ -110,12 +104,14 @@ class seq2seqIWGAN:
 
             # bidirectional RNN
             enc_outputs, enc_fw_state, enc_bw_state = rnn.static_bidirectional_rnn(stacked_lstm, stacked_lstm,
-                                                         tf.unstack(tf.transpose(enc_inputs, perm=[1, 0, 2])),
-                                                         initial_state_fw=init_state, initial_state_bw=init_state,
-                                                         scope='discriminator/encoder/')
+                                                                                   tf.unstack(tf.transpose(
+                                                                                       enc_inputs, perm=[1, 0, 2])),
+                                                                                   initial_state_fw=init_state, initial_state_bw=init_state,
+                                                                                   scope='discriminator/encoder/')
 
             dec_outputs, _, _ = rnn.static_bidirectional_rnn(stacked_lstm, stacked_lstm,
-                                                             tf.unstack(tf.transpose(dec_inputs,perm=[1, 0, 2])),
+                                                             tf.unstack(tf.transpose(
+                                                                 dec_inputs, perm=[1, 0, 2])),
                                                              initial_state_fw=enc_fw_state,
                                                              initial_state_bw=enc_bw_state,
                                                              scope='discriminator/decoder/')
@@ -131,9 +127,10 @@ class seq2seqIWGAN:
 
             # use only the last hidden state as input to dense layer
             outputs = tf.slice(outputs, [0, self.Config.DECODESTEPS - 1, 0], [self.batchsize, 1,
-                                                                            self.Config.AE_DENSE_NEURONS])
+                                                                              self.Config.AE_DENSE_NEURONS])
             # use last hidden state as input to a dense layer
-            outputs = tf.layers.dense(outputs, int(self.Config.AE_DENSE_NEURONS / 2), name='discriminator/pre_output')
+            outputs = tf.layers.dense(outputs, int(
+                self.Config.AE_DENSE_NEURONS / 2), name='discriminator/pre_output')
             # specify activation function here
             outputs = self.leakyrelu(outputs)
             # dropout
@@ -180,7 +177,8 @@ class seq2seqIWGAN:
                                                     time_major=False,
                                                     scope=scope)
                 outputs = self.leakyrelu(outputs)
-                outputs = tf.layers.dense(outputs, self.Config.DATA_DIM, name='autoencoder/enc_output')
+                outputs = tf.layers.dense(
+                    outputs, self.Config.DATA_DIM, name='autoencoder/enc_output')
                 # outputs = tf.sigmoid(outputs, name='autoencoder/sigmoid')
 
                 all_enc_outputs += [outputs]
@@ -192,13 +190,15 @@ class seq2seqIWGAN:
             enc_outputs = tf.concat(all_enc_outputs, 1)
 
             decoder_lstm = keras.layers.LSTM(self.Config.A_HIDDEN_NEURONS, return_sequences=True,
-                                            return_state=True)  # , dropout=0.2, recurrent_dropout=0.2)
-            decoder_dense = keras.layers.Dense(self.Config.NUM_CLASSES, activation='softmax')
+                                             return_state=True)  # , dropout=0.2, recurrent_dropout=0.2)
+            decoder_dense = keras.layers.Dense(
+                self.Config.NUM_CLASSES, activation='softmax')
             dec_states = [dec_states[0][0], dec_states[0][1]]
 
             for j in range(self.Config.DECODESTEPS):
 
-                outputs, state_h, state_c = decoder_lstm(dec_in, initial_state=dec_states)
+                outputs, state_h, state_c = decoder_lstm(
+                    dec_in, initial_state=dec_states)
                 outputs = decoder_dense(outputs)
 
                 all_dec_outputs += [outputs]
@@ -219,19 +219,20 @@ class seq2seqIWGAN:
         a_loss = []
         g_loss_diff = []
 
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-
-        data_in = tf.placeholder(tf.float32, shape=[None, self.timesteps, self.data_dim])
-        label_in = tf.placeholder(tf.float32, shape=[None, self.decodesteps, self.num_classes])
+        data_in = tf.placeholder(
+            tf.float32, shape=[None, self.timesteps, self.data_dim])
+        label_in = tf.placeholder(
+            tf.float32, shape=[None, self.decodesteps, self.num_classes])
         noise = tf.placeholder(tf.float32, shape=())
 
         fake_enc_data, fake_enc_states, fake_dec_data, fake_dec_states = self.generator(True, data_in,
                                                                                         label_in, noise, reuse=False)
         real_enc_data, real_enc_states, real_dec_data, real_dec_states = self.generator(False, data_in,
                                                                                         label_in, noise, reuse=True)
-        disc_fake = self.discriminator(fake_enc_data, fake_dec_data, reuse=False)
-        disc_real = self.discriminator(real_enc_data, real_dec_data, reuse=True)
+        disc_fake = self.discriminator(
+            fake_enc_data, fake_dec_data, reuse=False)
+        disc_real = self.discriminator(
+            real_enc_data, real_dec_data, reuse=True)
 
         autoenc_data, autoenc_label = self.autoencoder_seq2seq_pred(real_enc_data, real_enc_states, real_dec_data,
                                                                     real_dec_states, data_in, label_in, reuse=False)
@@ -240,12 +241,13 @@ class seq2seqIWGAN:
         ae_cost = 0
         # data AE loss
         ae_cost += tf.reduce_mean(tf.norm(tf.reshape(data_in, [self.batchsize, self.timesteps * self.data_dim]) -
-                                          tf.reshape(autoenc_data, [self.batchsize, self.timesteps * self.data_dim]),
+                                          tf.reshape(autoenc_data, [
+                                                     self.batchsize, self.timesteps * self.data_dim]),
                                           axis=1))
         # label AE loss
         ae_cost += tf.reduce_mean(tf.norm(tf.reshape(label_in, [self.batchsize, self.decodesteps * self.num_classes]) -
                                           tf.reshape(autoenc_label, [self.batchsize, self.decodesteps *
-                                                                    self.num_classes]),
+                                                                     self.num_classes]),
                                           axis=1))
 
         disc_cost_ = tf.reduce_mean(disc_fake) - tf.reduce_mean(disc_real)
@@ -258,11 +260,16 @@ class seq2seqIWGAN:
             minval=0.,
             maxval=1.
         )
-        dec_interpolates = alpha * real_dec_data + ((1 - alpha) * fake_dec_data)
-        enc_interpolates = alpha * real_enc_data + ((1 - alpha) * fake_enc_data)
-        disc_interpolates = self.discriminator(enc_interpolates, dec_interpolates, reuse=True)
-        gradients = tf.gradients(disc_interpolates, [enc_interpolates, dec_interpolates])[0]
-        slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), reduction_indices=[1]) + self.Config.EP)
+        dec_interpolates = alpha * real_dec_data + \
+            ((1 - alpha) * fake_dec_data)
+        enc_interpolates = alpha * real_enc_data + \
+            ((1 - alpha) * fake_enc_data)
+        disc_interpolates = self.discriminator(
+            enc_interpolates, dec_interpolates, reuse=True)
+        gradients = tf.gradients(
+            disc_interpolates, [enc_interpolates, dec_interpolates])[0]
+        slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients),
+                                       reduction_indices=[1]) + self.Config.EP)
         gradient_penalty = tf.reduce_mean((slopes - 1) ** 2)
         disc_cost = disc_cost_ + self.Config.LAMBDA * gradient_penalty
 
@@ -306,7 +313,9 @@ class seq2seqIWGAN:
             for epoch in range(self.Config.GAN_AE_EPOCHS):
                 print('epoch:', epoch)
                 np.random.shuffle(x_train)
-                minibatch_size = self.batchsize * (self.Config.DISC_CRITIC_ITERS + self.Config.GEN_CRITIC_ITERS + 1)
+                minibatch_size = self.batchsize * \
+                    (self.Config.DISC_CRITIC_ITERS +
+                     self.Config.GEN_CRITIC_ITERS + 1)
 
                 if (epoch + 1) % 100 == 0:
                     if self.data == 'Sentiment':
@@ -324,13 +333,17 @@ class seq2seqIWGAN:
                     print(_noise)
 
                 for i in range(int(len(x_train) // (self.batchsize * (self.Config.DISC_CRITIC_ITERS +
-                                                                          self.Config.GEN_CRITIC_ITERS + 1)))):
-                    data_minibatch = x_train[i * minibatch_size: (i + 1) * minibatch_size]
-                    label_minibatch = y_train[i * minibatch_size: (i + 1) * minibatch_size]
+                                                                      self.Config.GEN_CRITIC_ITERS + 1)))):
+                    data_minibatch = x_train[i *
+                                             minibatch_size: (i + 1) * minibatch_size]
+                    label_minibatch = y_train[i *
+                                              minibatch_size: (i + 1) * minibatch_size]
                     print('minibatch:', i)
                     for j in range(self.Config.GEN_CRITIC_ITERS):
-                        _data = data_minibatch[j * self.batchsize: (j + 1) * self.batchsize]
-                        _label = label_minibatch[j * self.batchsize: (j + 1) * self.batchsize]
+                        _data = data_minibatch[j *
+                                               self.batchsize: (j + 1) * self.batchsize]
+                        _label = label_minibatch[j *
+                                                 self.batchsize: (j + 1) * self.batchsize]
                         _gen_cost, _gen_cost_diff, _ = session.run([gen_cost, gen_cost_, gen_train_op],
                                                                    feed_dict={data_in: _data, label_in: _label,
                                                                               noise: _noise})
@@ -338,9 +351,9 @@ class seq2seqIWGAN:
                         g_loss_diff += [_gen_cost_diff]
                     for j in range(self.Config.DISC_CRITIC_ITERS):
                         _data = data_minibatch[(self.Config.GEN_CRITIC_ITERS + j) * self.batchsize:
-                        (self.Config.GEN_CRITIC_ITERS + j + 1) * self.batchsize]
+                                               (self.Config.GEN_CRITIC_ITERS + j + 1) * self.batchsize]
                         _label = label_minibatch[(self.Config.GEN_CRITIC_ITERS + j) * self.batchsize:
-                        (self.Config.GEN_CRITIC_ITERS + j + 1) * self.batchsize]
+                                                 (self.Config.GEN_CRITIC_ITERS + j + 1) * self.batchsize]
                         _disc_cost, _disc_cost_diff, _ = session.run([disc_cost, disc_cost_, disc_train_op],
                                                                      feed_dict={data_in: _data, label_in: _label,
                                                                                 noise: _noise})
@@ -351,31 +364,37 @@ class seq2seqIWGAN:
                                            self.batchsize: (self.Config.GEN_CRITIC_ITERS +
                                                             self.Config.DISC_CRITIC_ITERS + 1) * self.batchsize]
                     _label = label_minibatch[(self.Config.DISC_CRITIC_ITERS + self.Config.GEN_CRITIC_ITERS) *
-                                           self.batchsize: (self.Config.GEN_CRITIC_ITERS +
-                                                            self.Config.DISC_CRITIC_ITERS + 1) * self.batchsize]
+                                             self.batchsize: (self.Config.GEN_CRITIC_ITERS +
+                                                              self.Config.DISC_CRITIC_ITERS + 1) * self.batchsize]
                     _ae_cost, _ = session.run([ae_cost, autoenc_train_op], feed_dict={data_in: _data, label_in: _label,
                                                                                       noise: _noise})
                     a_loss += [_ae_cost]
 
                 if epoch >= 0 and epoch % self.Config.CHECKPOINT_STEP == 0:
-                    saver.save(session, save_dir + 'model', global_step=epoch)
-                    np.save(save_dir + 'd_loss.npy', d_loss)
-                    np.save(save_dir + 'g_loss.npy', g_loss)
-                    np.save(save_dir + 'g_diff_loss.npy', g_loss_diff)
-                    np.save(save_dir + 'd_diff_loss.npy', d_loss_diff)
-                    np.save(save_dir + 'a_loss.npy', a_loss)
+                    saver.save(
+                        session,
+                        save_dir / 'model.ckpt',
+                        global_step=epoch,
+                    )
+                    np.save(save_dir / 'd_loss.npy', d_loss)
+                    np.save(save_dir / 'g_loss.npy', g_loss)
+                    np.save(save_dir / 'g_diff_loss.npy', g_loss_diff)
+                    np.save(save_dir / 'd_diff_loss.npy', d_loss_diff)
+                    np.save(save_dir / 'a_loss.npy', a_loss)
 
-            saver.save(session, save_dir + 'model', global_step=self.Config.GAN_AE_EPOCHS - 1)
-            np.save(save_dir + 'd_loss.npy', d_loss)
-            np.save(save_dir + 'g_loss.npy', g_loss)
-            np.save(save_dir + 'g_diff_loss.npy', g_loss_diff)
-            np.save(save_dir + 'd_diff_loss.npy', d_loss_diff)
-            np.save(save_dir + 'a_loss.npy', a_loss)
-
-        return
-
+            saver.save(
+                session,
+                save_dir / 'model.ckpt',
+                global_step=self.Config.GAN_AE_EPOCHS - 1
+            )
+            np.save(save_dir / 'd_loss.npy', d_loss)
+            np.save(save_dir / 'g_loss.npy', g_loss)
+            np.save(save_dir / 'g_diff_loss.npy', g_loss_diff)
+            np.save(save_dir / 'd_diff_loss.npy', d_loss_diff)
+            np.save(save_dir / 'a_loss.npy', a_loss)
 
     # build a model to generate ensembles of data
+
     def iwganGenEnsemFolder(self, data_dir, save_dir, checkpoint, flag):
 
         if not os.path.exists(save_dir):
@@ -386,8 +405,10 @@ class seq2seqIWGAN:
 
         print('calculate loss function')
         # get model outputs
-        data_in = tf.placeholder(tf.float32, shape=[None, self.timesteps, self.data_dim])
-        label_in = tf.placeholder(tf.float32, shape=[None, self.decodesteps, self.num_classes])
+        data_in = tf.placeholder(
+            tf.float32, shape=[None, self.timesteps, self.data_dim])
+        label_in = tf.placeholder(
+            tf.float32, shape=[None, self.decodesteps, self.num_classes])
         noise = 0.0
 
         fake_enc_data, fake_enc_states, fake_dec_data, fake_dec_states = self.generator(True, data_in,
@@ -425,7 +446,8 @@ class seq2seqIWGAN:
                 dat = np.load(data_dir + 'ensem_dat' + str(ensem) + '.npy')
                 lab = np.load(data_dir + 'ensem_lab' + str(ensem) + '.npy')
 
-                lab_ = np.reshape(lab, (lab.shape[0], lab.shape[1]*lab.shape[2]))
+                lab_ = np.reshape(
+                    lab, (lab.shape[0], lab.shape[1]*lab.shape[2]))
                 lab_ = [dict_[tuple(x.tolist())] for x in lab_]
                 idx = np.where(lab_ != 0)[0]
 
@@ -444,10 +466,14 @@ class seq2seqIWGAN:
                         x_train = np.repeat(x_train, self.batchsize, axis=0)
                         y_train = np.repeat(y_train, self.batchsize, axis=0)
                         for i in range(int(len(x_train)) // self.batchsize):
-                            data_ = x_train[i * self.batchsize: (i + 1) * self.batchsize]
-                            label_ = y_train[i * self.batchsize: (i + 1) * self.batchsize]
-                            syn_dat += [autoenc_data.eval(feed_dict={data_in: data_, label_in: label_})]
-                            syn_lab += [autoenc_label.eval(feed_dict={data_in: data_, label_in: label_})]
+                            data_ = x_train[i *
+                                            self.batchsize: (i + 1) * self.batchsize]
+                            label_ = y_train[i *
+                                             self.batchsize: (i + 1) * self.batchsize]
+                            syn_dat += [autoenc_data.eval(
+                                feed_dict={data_in: data_, label_in: label_})]
+                            syn_lab += [autoenc_label.eval(
+                                feed_dict={data_in: data_, label_in: label_})]
 
                         syn_dat = np.array(syn_dat)
                         syn_lab = np.array(syn_lab)
@@ -457,21 +483,28 @@ class seq2seqIWGAN:
                         syn_dat = syn_dat[0::self.batchsize]
                     else:
                         for i in range(int(len(x_train)) // self.batchsize):
-                            data_ = x_train[i * self.batchsize: (i + 1) * self.batchsize]
-                            label_ = y_train[i * self.batchsize: (i + 1) * self.batchsize]
-                            syn_dat += [autoenc_data.eval(feed_dict={data_in: data_, label_in: label_})]
-                            syn_lab += [autoenc_label.eval(feed_dict={data_in: data_, label_in: label_})]
+                            data_ = x_train[i *
+                                            self.batchsize: (i + 1) * self.batchsize]
+                            label_ = y_train[i *
+                                             self.batchsize: (i + 1) * self.batchsize]
+                            syn_dat += [autoenc_data.eval(
+                                feed_dict={data_in: data_, label_in: label_})]
+                            syn_lab += [autoenc_label.eval(
+                                feed_dict={data_in: data_, label_in: label_})]
 
                         syn_dat = np.array(syn_dat)
                         syn_lab = np.array(syn_lab)
                         syn_lab = np.round(syn_lab)
 
-
                 print(syn_lab)
-                syn_dat.resize(syn_dat.shape[0] * syn_dat.shape[1], syn_dat.shape[2], syn_dat.shape[3])
-                syn_lab.resize(syn_lab.shape[0] * syn_lab.shape[1], syn_lab.shape[2], syn_lab.shape[3])
-                np.save(save_dir + 'synthetic_data_' + str(ensem) + '.npy', syn_dat)
-                np.save(save_dir + 'synthetic_label_' + str(ensem) + '.npy', syn_lab)
+                syn_dat.resize(
+                    syn_dat.shape[0] * syn_dat.shape[1], syn_dat.shape[2], syn_dat.shape[3])
+                syn_lab.resize(
+                    syn_lab.shape[0] * syn_lab.shape[1], syn_lab.shape[2], syn_lab.shape[3])
+                np.save(save_dir + 'synthetic_data_' +
+                        str(ensem) + '.npy', syn_dat)
+                np.save(save_dir + 'synthetic_label_' +
+                        str(ensem) + '.npy', syn_lab)
         return
 
     def iwganGenEnsemListFolder(self, data_dir, ensem_list, save_dir, checkpoint, flag):
@@ -484,8 +517,10 @@ class seq2seqIWGAN:
 
         print('calculate loss function')
         # get model outputs
-        data_in = tf.placeholder(tf.float32, shape=[None, self.timesteps, self.data_dim])
-        label_in = tf.placeholder(tf.float32, shape=[None, self.decodesteps, self.num_classes])
+        data_in = tf.placeholder(
+            tf.float32, shape=[None, self.timesteps, self.data_dim])
+        label_in = tf.placeholder(
+            tf.float32, shape=[None, self.decodesteps, self.num_classes])
         noise = 0.0
 
         fake_enc_data, fake_enc_states, fake_dec_data, fake_dec_states = self.generator(True, data_in,
@@ -538,18 +573,26 @@ class seq2seqIWGAN:
                     np.random.shuffle(x_train)
 
                     for i in range(int(len(x_train)) // self.batchsize):
-                        data_ = x_train[i * self.batchsize: (i + 1) * self.batchsize]
-                        label_ = y_train[i * self.batchsize: (i + 1) * self.batchsize]
-                        syn_dat += [autoenc_data.eval(feed_dict={data_in: data_, label_in: label_})]
-                        syn_lab += [autoenc_label.eval(feed_dict={data_in: data_, label_in: label_})]
+                        data_ = x_train[i *
+                                        self.batchsize: (i + 1) * self.batchsize]
+                        label_ = y_train[i *
+                                         self.batchsize: (i + 1) * self.batchsize]
+                        syn_dat += [autoenc_data.eval(
+                            feed_dict={data_in: data_, label_in: label_})]
+                        syn_lab += [autoenc_label.eval(
+                            feed_dict={data_in: data_, label_in: label_})]
 
                 syn_dat = np.array(syn_dat)
                 syn_lab = np.array(syn_lab)
                 syn_lab = np.round(syn_lab)
-                syn_dat.resize(syn_dat.shape[0] * syn_dat.shape[1], syn_dat.shape[2], syn_dat.shape[3])
-                syn_lab.resize(syn_lab.shape[0] * syn_lab.shape[1], syn_lab.shape[2], syn_lab.shape[3])
-                np.save(save_dir + 'synthetic_data_' + str(ensem) + '.npy', syn_dat)
-                np.save(save_dir + 'synthetic_label_' + str(ensem) + '.npy', syn_lab)
+                syn_dat.resize(
+                    syn_dat.shape[0] * syn_dat.shape[1], syn_dat.shape[2], syn_dat.shape[3])
+                syn_lab.resize(
+                    syn_lab.shape[0] * syn_lab.shape[1], syn_lab.shape[2], syn_lab.shape[3])
+                np.save(save_dir + 'synthetic_data_' +
+                        str(ensem) + '.npy', syn_dat)
+                np.save(save_dir + 'synthetic_label_' +
+                        str(ensem) + '.npy', syn_lab)
         return
 
     # use this function to integrate synthetic data with real data
@@ -559,7 +602,6 @@ class seq2seqIWGAN:
 
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-
 
         for i in range(self.Config.AE_NUM_ENSEMBLES):
 
